@@ -1,65 +1,33 @@
 package com.agriserve.service;
 
-import com.agriserve.dto.ComplianceDTO;
-import com.agriserve.entity.ComplianceRecord;
-import com.agriserve.entity.User;
-import com.agriserve.repository.AdvisorySessionRepository;
-import com.agriserve.repository.ComplianceRecordRepository;
-import com.agriserve.repository.UserRepository;
-import com.agriserve.repository.WorkshopRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.agriserve.dto.request.AuditRequest;
+import com.agriserve.dto.request.ComplianceRecordRequest;
+import com.agriserve.dto.response.AuditResponse;
+import com.agriserve.dto.response.ComplianceRecordResponse;
+import com.agriserve.entity.enums.Status;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
-import java.util.List;
+/**
+ * Contract for Compliance & Audit management.
+ */
+public interface ComplianceService {
 
-@Service
-@Transactional
-@RequiredArgsConstructor
-public class ComplianceService {
+    // Compliance Records
+    ComplianceRecordResponse createComplianceRecord(ComplianceRecordRequest request);
 
-    private final ComplianceRecordRepository complianceRepo;
-    private final UserRepository userRepo;
-    // We inject these to verify the EntityID actually exists
-    private final WorkshopRepository workshopRepo;
-    private final AdvisorySessionRepository sessionRepo;
+    ComplianceRecordResponse getComplianceRecordById(Long complianceId);
 
-    public ComplianceRecord saveCompliance(ComplianceDTO dto) {
-        // 1. Verify the Extension Officer exists
-        User officer = userRepo.findById(dto.getOfficerId())
-                .orElseThrow(() -> new RuntimeException("Extension Officer not found with ID: " + dto.getOfficerId()));
+    Page<ComplianceRecordResponse> getComplianceByEntityId(Long entityId, Pageable pageable);
 
-        // 2. Business Logic: Verify the Workshop or Session exists based on Type
-        if (dto.getType() == ComplianceRecord.ComplianceType.TRAINING) {
-            if (!workshopRepo.existsById(dto.getEntityId())) {
-                throw new RuntimeException("Workshop not found for Compliance ID: " + dto.getEntityId());
-            }
-        } else if (dto.getType() == ComplianceRecord.ComplianceType.ADVISORY) {
-            if (!sessionRepo.existsById(dto.getEntityId())) {
-                throw new RuntimeException("Advisory Session not found for Compliance ID: " + dto.getEntityId());
-            }
-        }
+    Page<ComplianceRecordResponse> getAllComplianceRecords(Pageable pageable);
 
-        // 3. Map DTO to Entity
-        ComplianceRecord record = new ComplianceRecord();
-        record.setEntityId(dto.getEntityId());
-        record.setType(dto.getType());
-        record.setResult(dto.getResult());
-        record.setNotes(dto.getNotes());
-        record.setExtensionOfficer(officer);
+    // Audits
+    AuditResponse createAudit(AuditRequest request);
 
-        return complianceRepo.save(record);
-    }
+    AuditResponse getAuditById(Long auditId);
 
-    public List<ComplianceRecord> getRecordsByEntity(Long entityId, ComplianceRecord.ComplianceType type) {
-       return complianceRepo.findByEntityIdAndType(entityId, type);
-    }
+    Page<AuditResponse> getAllAudits(Status status, Pageable pageable);
 
-    public List<ComplianceRecord> getRecordsByResult(ComplianceRecord.ComplianceResult result) {
-        return complianceRepo.findByResult(result);
-    }
-
-    public List<ComplianceRecord> getRecordsByOfficer(Long userId) {
-        return complianceRepo.findByExtensionOfficer_UserId(userId);
-    }
+    AuditResponse updateAuditStatus(Long auditId, Status status);
 }

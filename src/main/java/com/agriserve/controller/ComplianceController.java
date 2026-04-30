@@ -1,42 +1,105 @@
 package com.agriserve.controller;
 
-import com.agriserve.dto.ComplianceDTO;
-import com.agriserve.entity.ComplianceRecord;
+import com.agriserve.dto.request.AuditRequest;
+import com.agriserve.dto.request.ComplianceRecordRequest;
+import com.agriserve.dto.response.ApiResponse;
+import com.agriserve.dto.response.AuditResponse;
+import com.agriserve.dto.response.ComplianceRecordResponse;
+import com.agriserve.entity.enums.Status;
 import com.agriserve.service.ComplianceService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
+/**
+ * REST controller for Compliance & Audit Management.
+ */
+@Tag(name = "Compliance", description = "Compliance records and formal audits")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping("/api/compliance")
+@RequestMapping("/compliance")
 @RequiredArgsConstructor
 public class ComplianceController {
 
     private final ComplianceService complianceService;
 
-    @PostMapping("/record")
-    public ResponseEntity<ComplianceRecord> createRecord(@RequestBody ComplianceDTO dto) {
-        ComplianceRecord record = complianceService.saveCompliance(dto);
-        return new ResponseEntity<>(record, HttpStatus.CREATED);
+    // ─── Compliance Records ───────────────────────────────────────────────────
+
+    @Operation(summary = "Create a compliance record (Compliance Officer / Admin)")
+    @PostMapping("/records")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ComplianceRecordResponse>> createRecord(
+            @Valid @RequestBody ComplianceRecordRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(complianceService.createComplianceRecord(request), "Compliance record created"));
     }
 
-
-    @GetMapping("/entity/{entityId}/{type}")
-    public ResponseEntity<List<ComplianceRecord>> getByEntity(@PathVariable Long entityId,@PathVariable ComplianceRecord.ComplianceType type) {
-        return ResponseEntity.ok(complianceService.getRecordsByEntity(entityId,type));
+    @Operation(summary = "Get compliance record by ID")
+    @GetMapping("/records/{complianceId}")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'GOVERNMENT_AUDITOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ComplianceRecordResponse>> getRecord(@PathVariable Long complianceId) {
+        return ResponseEntity.ok(ApiResponse.success(complianceService.getComplianceRecordById(complianceId)));
     }
 
-    @GetMapping("/filter")
-    public ResponseEntity<List<ComplianceRecord>> getByResult(
-            @RequestParam ComplianceRecord.ComplianceResult result) {
-        return ResponseEntity.ok(complianceService.getRecordsByResult(result));
+    @Operation(summary = "Get all compliance records for a specific entity (farmer / program / workshop)")
+    @GetMapping("/records/entity/{entityId}")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'GOVERNMENT_AUDITOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Page<ComplianceRecordResponse>>> getByEntity(
+            @PathVariable Long entityId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(complianceService.getComplianceByEntityId(entityId, pageable)));
     }
 
-    @GetMapping("/officer/{userId}")
-    public ResponseEntity<List<ComplianceRecord>> getByOfficer(@PathVariable Long userId) {
-        return ResponseEntity.ok(complianceService.getRecordsByOfficer(userId));
+    @Operation(summary = "Get all compliance records")
+    @GetMapping("/records")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'GOVERNMENT_AUDITOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Page<ComplianceRecordResponse>>> getAllRecords(
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(complianceService.getAllComplianceRecords(pageable)));
+    }
+
+    // ─── Audits ───────────────────────────────────────────────────────────────
+
+    @Operation(summary = "Create a formal audit (Compliance Officer / Auditor)")
+    @PostMapping("/audits")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'GOVERNMENT_AUDITOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<AuditResponse>> createAudit(
+            @Valid @RequestBody AuditRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(complianceService.createAudit(request), "Audit initiated"));
+    }
+
+    @Operation(summary = "Get audit by ID")
+    @GetMapping("/audits/{auditId}")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'GOVERNMENT_AUDITOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<AuditResponse>> getAudit(@PathVariable Long auditId) {
+        return ResponseEntity.ok(ApiResponse.success(complianceService.getAuditById(auditId)));
+    }
+
+    @Operation(summary = "Get all audits (filterable by status)")
+    @GetMapping("/audits")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'GOVERNMENT_AUDITOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Page<AuditResponse>>> getAllAudits(
+            @RequestParam(required = false) Status status,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(complianceService.getAllAudits(status, pageable)));
+    }
+
+    @Operation(summary = "Update audit status (Compliance Officer / Admin)")
+    @PatchMapping("/audits/{auditId}/status")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER', 'GOVERNMENT_AUDITOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<AuditResponse>> updateAuditStatus(
+            @PathVariable Long auditId,
+            @RequestParam Status status) {
+        return ResponseEntity.ok(ApiResponse.success(complianceService.updateAuditStatus(auditId, status)));
     }
 }

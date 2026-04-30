@@ -1,20 +1,16 @@
 package com.agriserve.repository;
 
+import com.agriserve.entity.Audit;
+import com.agriserve.entity.enums.Status;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import com.agriserve.entity.Audit;
-
-import java.util.List;
 
 @Repository
 public interface AuditRepository extends JpaRepository<Audit, Long> {
 
-    // Find all audits performed on a specific Extension Officer
-    List<Audit> findByOfficer_UserId(Long userId);
+    Page<Audit> findAllByOfficer_UserId(Long officerId, Pageable pageable);
 
-    // Find audits based on their status (OPEN, IN_PROGRESS, RESOLVED)
-    List<Audit> findByStatus(Audit.AuditStatus status);
-
-    // Find audits within a specific Scope string
-    List<Audit> findByScopeContaining(String locationOrProgram);
+    Page<Audit> findAllByStatus(Status status, Pageable pageable);
 }
